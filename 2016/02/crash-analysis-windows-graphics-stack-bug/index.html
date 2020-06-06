@@ -1,0 +1,155 @@
+<!DOCTYPE html><html class="nprogress-busy" lang="en"><head><meta charset="utf-8"><meta content="ie=edge" http-equiv="x-ua-compatible"><link href="/css/index.8abdea1f0a4fab97fb2a612d0a6c8fe1.css" rel="stylesheet"><script defer src="/js/runtime.e8b300f0556ed5d0c4aa.js" type="text/javascript"></script><script defer src="/js/vendor.2214c7d88e9dd54634d1.js" type="text/javascript"></script><script defer src="/js/index.e332e09cc7e67f046901.js" type="text/javascript"></script><!-- Google Tag Manager --><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-MZ2DHR');</script><!-- End Google Tag Manager --><script defer src="/js/chunks/common-index.9d929302abc5499a1dd6.js" type="text/javascript" charset="utf-8"></script><script defer src="/js/chunks/463b5588e9d0898124deda95a650ab04.aacedf2b32d23a886f28.js" type="text/javascript" charset="utf-8"></script><script defer src="/js/chunks/fd386dadc1cf9935e5882fcfbf40fb5d.414378448a6a68d300e3.js" type="text/javascript" charset="utf-8"></script><title>Crash Analysis: Windows Graphics Stack Bug | Prasanna Loganathar</title><link href="/icons/favicon-32x32.png" rel="icon" data-react-helmet="true" sizes="32x32" type="image/png"><link href="/icons/favicon-96x96.png" rel="icon" data-react-helmet="true" sizes="96x96" type="image/png"><link href="/icons/favicon-16x16.png" rel="icon" data-react-helmet="true" sizes="16x16" type="image/png"><link href="/favicon.ico" rel="shortcut icon" data-react-helmet="true" type="image/x-icon"><link href="/icons/apple-touch-icon-57x57.png" rel="apple-touch-icon" data-react-helmet="true" sizes="57x57"><link href="/icons/apple-touch-icon-60x60.png" rel="apple-touch-icon" data-react-helmet="true" sizes="60x60"><link href="/icons/apple-touch-icon-72x72.png" rel="apple-touch-icon" data-react-helmet="true" sizes="72x72"><link href="/icons/apple-touch-icon-76x76.png" rel="apple-touch-icon" data-react-helmet="true" sizes="76x76"><link href="/icons/apple-touch-icon-114x114.png" rel="apple-touch-icon" data-react-helmet="true" sizes="114x114"><link href="/icons/apple-touch-icon-120x120.png" rel="apple-touch-icon" data-react-helmet="true" sizes="120x120"><link href="/icons/apple-touch-icon-144x144.png" rel="apple-touch-icon" data-react-helmet="true" sizes="144x144"><link href="/icons/apple-touch-icon-152x152.png" rel="apple-touch-icon" data-react-helmet="true" sizes="152x152"><link href="/icons/apple-touch-icon-180x180.png" rel="apple-touch-icon" data-react-helmet="true" sizes="180x180"><link href="/icons/safari-pinned-tab.svg" rel="mask-icon" data-react-helmet="true" color="#0096d6"><link href="/manifest.json" rel="manifest" data-react-helmet="true"><link href="https://www.prasannavl.com/rss.xml" rel="alternate" data-react-helmet="true" type="application/rss+xml"><link href="https://www.prasannavl.com/sitemap.xml" rel="sitemap" data-react-helmet="true"><meta content="Prasanna Loganathar's Weblog" data-react-helmet="true" name="description"><meta content="width=device-width,initial-scale=1,shrink-to-fit=no" data-react-helmet="true" name="viewport"><meta content="#0096d6" data-react-helmet="true" name="msapplication-TileColor"><meta content="/icons/mstile-144x144.png" data-react-helmet="true" name="msapplication-TileImage"><meta content="/browserconfig.xml" data-react-helmet="true" name="msapplication-config"><meta content="summary" data-react-helmet="true" name="twitter:card"><meta content="@prasannavl" data-react-helmet="true" name="twitter:site"><meta content="@prasannavl" data-react-helmet="true" name="twitter:creator"><meta content="Crash Analysis: Windows Graphics Stack Bug" data-react-helmet="true" name="twitter:title"><meta content="Crash analysis of a Graphics bug in the Windows 10 kernel based on Threshold/RedStone release" data-react-helmet="true" name="twitter:description"><meta content="Crash Analysis: Windows Graphics Stack Bug" data-react-helmet="true" property="og:title"><meta content="Prasanna Loganathar" data-react-helmet="true" property="og:site_name"><meta content="article" data-react-helmet="true" property="og:type"><meta content="Crash analysis of a Graphics bug in the Windows 10 kernel based on Threshold/RedStone release" data-react-helmet="true" property="og:description"><meta content="https://www.prasannavl.com//icons/mstile-310x310.png" data-react-helmet="true" property="og:image"><meta content="http://localhost:45678/2016/02/crash-analysis-windows-graphics-stack-bug/" data-react-helmet="true" property="og:url"><meta content="Prasanna Loganathar" data-react-helmet="true" property="og:article:author"><meta content="2016-02-12T04:54:02.577Z" data-react-helmet="true" property="og:article:article:published_time"></head><body><!-- Google Tag Manager (noscript) --><noscript><iframe height="0" src="https://www.googletagmanager.com/ns.html?id=GTM-MZ2DHR" style="display:none;visibility:hidden" width="0"></iframe></noscript><!-- End Google Tag Manager (noscript) --><div id="root"><div class="app-container container-fluid"><div class="row"><div class="col col-md-8 offset-md-2"><header class="banner"><h1 id="top"><a href="/">Prasanna Loganathar</a></h1><p>Explore more of <a href="/">my blog</a>, <a href="/archives/">archives</a> or subscribe to my <a href="/rss.xml" rel="alternate" type="application/rss+xml">feed</a>.</p><hr></header><main role="main"><article><header class="mb-4"><h1 class="title" rel="title">Crash Analysis: Windows Graphics Stack Bug</h1><p class="d-none" rel="author">Prasanna Loganathar</p><p class="small text-muted" rel="date"><time datetime="2016-02-12T04:54:02.577Z">Friday, 12th Feb 2016</time></p></header><p class="note">This issue has been filed with Microsoft, and the current state of the issue can be followed up on Microsoft TechNet if you're affected by it or would like to add on to it here: <a href="https://social.technet.microsoft.com/Forums/en-US/d45e4063-3d73-4f51-a295-972f3be3a456/graphics-stack-bug-windows-10-build-threshold-release-10586-including-redstone?forum=win10itprogeneral">Graphics stack bug - Windows 10 Build Threshold Release (10586+, including RedStone)</a></p><h2>Affected Configuration</h2><ul><li>Windows 10 - Threshold Release (10586+, including the initial builds of RedStone)</li><li>Intel HD Graphics 5500 with Nvidia GeForce 950M (Optimus pipeline)</li></ul><h2>Context</h2><p>A few weeks ago, being on the Insider Fast Ring, I updated myself to the first release based on the Redstone build likely during the first few hours. Some of the issues I noticed ended up being documented a few days later. My laptop was a HP Envy 15 with an Nvidia Optimus based GeForce 950M, and Intel HD Graphics 5500. However, I noticed weird issues as my screen turned black (but didn't switch off), and the cursor was occasionally visible once every 5-10 seconds or so (but cursor response took about 20-30 seconds). Strange. Most reasonable guess was the graphics driver. Hard reset of the laptop, and everything seemed to be quite fine. Strangely, there were no memory dumps (since the system actually didn't crash I guess), but fortunately the event logs did have a never-ending list of <code>Graphics card crashed and recovered unexpectedly.</code></p><p><b>The RedStone update also ended up in weird bugs and event logs filled with errors, mostly due to COM permission issues and so on</b>. Meanwhile, a few hours later, there was an update available for my Intel HD 5500. Great, I was optimistic the issue was getting fixed. However, installing the driver (through Windows Update), ended up in the same blank screen again. Another hard reset, where Windows recovered itself to the last known state, and with similar errors. Meanwhile, my Nvidia card had an update. That was fast. Perhaps, that was the missing piece, and the Nvidia driver this time - same results. Since, the Optimus pipeline relies on the Intel card, it still provided nothing conclusive. Just blank screen. Another hard reset, but now I decided to do a full reset. (This was two days before it was documented that the RedStone build's <em>Reset</em> ended up in an unusable system completely breaking it requiring a fresh clean install).</p><p>So, there it was. Now, I decided that I had enough with the new RedStone build, and move back to 10586 - the stable build. To my surprise, the graphics drivers ended up with the same result, and blank screen! Another hard reset and the graphics driver worked however. It always seemed to crash repeatedly during the install. However, thankfully, this time, I ended up with a lot of LiveKernelReports. Finally, we are getting somewhere. But a bit too many memorydumps.</p><p><img alt="[Screenshot 1]" class="img-fluid" src="/img/crash-analysis-screen-1.b66924924e48c2f26ff81708a3b809b4.jpg"></p><p><strong>493 minidumps!</strong> Hmm.</p><h2>Analysis</h2><p>Naturally, next step was to figure out what was wrong. So, WinDbg for all of them resulted in the following call stack:</p><pre><code>0: kd> k
+# Child-SP          RetAddr           Call Site
+00 ffffd000`275c3a00 fffff800`9d7671fc watchdog!WdDbgReportRecreate+0x104
+01 ffffd000`275c3a50 fffff800`9d76675f dxgkrnl!TdrUpdateDbgReport+0xec
+02 ffffd000`275c3aa0 fffff800`9d753345 dxgkrnl!TdrCollectDbgInfoStage2+0x1df
+03 ffffd000`275c3ad0 fffff800`9d766e65 dxgkrnl!DXGADAPTER::Reset+0x21d
+04 ffffd000`275c3b20 fffff800`9d766fbb dxgkrnl!TdrResetFromTimeout+0x15
+05 ffffd000`275c3b50 fffff803`35e78b79 dxgkrnl!TdrResetFromTimeoutWorkItem+0x5b
+06 ffffd000`275c3b80 fffff803`35e17125 nt!ExpWorkerThread+0xe9
+07 ffffd000`275c3c10 fffff803`35f55916 nt!PspSystemThreadStartup+0x41
+08 ffffd000`275c3c60 00000000`00000000 nt!KiStartSystemThread+0x16</code></pre><p>Ok, that was <strong>dxgkrnl</strong> - the graphics stack. Next up the analysis ended up with straight forward message:</p><pre><code>VIDEO_TDR_TIMEOUT_DETECTED (117)
+The display driver failed to respond in timely fashion.
+(This code can never be used for a real bugcheck.)
+Arguments:
+Arg1: ffffe0011e57d4c0, Optional pointer to internal TDR recovery context (TDR_RECOVERY_CONTEXT).
+Arg2: fffff800a4c620f0, The pointer into responsible device driver module (e.g owner tag).
+Arg3: 0000000000000000, The secondary driver specific bucketing key.
+Arg4: 0000000000000000, Optional internal context dependent data.
+
+Debugging Details:
+------------------
+
+
+DUMP_CLASS: 1
+
+DUMP_QUALIFIER: 400
+
+BUILD_VERSION_STRING:  10586.63.amd64fre.th2_release.160104-1513
+
+DUMP_TYPE:  2
+
+BUGCHECK_P1: ffffe0011e57d4c0
+
+BUGCHECK_P2: fffff800a4c620f0
+
+BUGCHECK_P3: 0
+
+BUGCHECK_P4: 0
+
+FAULTING_IP: 
+igdkmd64+120f0
+fffff800`a4c620f0 ??              ???
+
+DEFAULT_BUCKET_ID:  GRAPHICS_DRIVER_TDR_TIMEOUT
+
+TAG_NOT_DEFINED_202b:  *** Unknown TAG in analysis list 202b
+
+
+CPU_COUNT: 4
+
+CPU_MHZ: 95a
+
+CPU_VENDOR:  GenuineIntel
+
+CPU_FAMILY: 6
+
+CPU_MODEL: 3d
+
+CPU_STEPPING: 4
+
+BUGCHECK_STR:  0x117
+
+PROCESS_NAME:  System
+
+CURRENT_IRQL:  0
+
+ANALYSIS_SESSION_HOST:  PVL-FALCON
+
+ANALYSIS_SESSION_TIME:  02-15-2016 06:26:31.0556
+
+ANALYSIS_VERSION: 10.0.10586.567 amd64fre
+
+STACK_TEXT:  
+ffffd000`275c3a00 fffff800`9d7671fc : ffffe001`1e57d4c0 00000000`80000000 ffffe001`1e57d4c0 ffffe001`32fd3010 : watchdog!WdDbgReportRecreate+0x104
+ffffd000`275c3a50 fffff800`9d76675f : ffffc000`00000000 ffffc000`cb9f1500 ffffe001`1e57d4c0 ffffe001`33482408 : dxgkrnl!TdrUpdateDbgReport+0xec
+ffffd000`275c3aa0 fffff800`9d753345 : ffffc000`d1c89c24 ffffe001`334823a0 ffffe001`334823a0 ffffe001`33482408 : dxgkrnl!TdrCollectDbgInfoStage2+0x1df
+ffffd000`275c3ad0 fffff800`9d766e65 : ffffe001`32370150 00000000`00000000 00000000`00000000 00000000`00000000 : dxgkrnl!DXGADAPTER::Reset+0x21d
+ffffd000`275c3b20 fffff800`9d766fbb : 00000000`00000200 fffff803`361a1340 ffffe001`1c208c90 fffff803`35e90910 : dxgkrnl!TdrResetFromTimeout+0x15
+ffffd000`275c3b50 fffff803`35e78b79 : ffffe001`333c7040 fffff800`9d766f60 ffffe001`1fe25610 fffff803`361a1340 : dxgkrnl!TdrResetFromTimeoutWorkItem+0x5b
+ffffd000`275c3b80 fffff803`35e17125 : 00000005`b19bbdff 00000000`00000080 ffffe001`1b8a2040 ffffe001`333c7040 : nt!ExpWorkerThread+0xe9
+ffffd000`275c3c10 fffff803`35f55916 : ffffd000`20720180 ffffe001`333c7040 fffff803`35e170e4 ffeceff1`ffeceff1 : nt!PspSystemThreadStartup+0x41
+ffffd000`275c3c60 00000000`00000000 : ffffd000`275c4000 ffffd000`275be000 00000000`00000000 00000000`00000000 : nt!KiStartSystemThread+0x16
+
+
+STACK_COMMAND:  kb
+
+THREAD_SHA1_HASH_MOD_FUNC:  26032a29a837a16b5eba8813d816bfe6c3aea8a7
+
+THREAD_SHA1_HASH_MOD_FUNC_OFFSET:  2a98f27881b30ef00b3362f6f34c45e22e7dcaf5
+
+THREAD_SHA1_HASH_MOD:  7558c67383100ca76738f2615528c656f1c43af3
+
+FOLLOWUP_IP: 
+igdkmd64+120f0
+fffff800`a4c620f0 ??              ???
+
+SYMBOL_NAME:  igdkmd64+120f0
+
+FOLLOWUP_NAME:  MachineOwner
+
+MODULE_NAME: igdkmd64
+
+IMAGE_NAME:  igdkmd64.sys
+
+DEBUG_FLR_IMAGE_TIMESTAMP:  5678d0a8
+
+FAILURE_BUCKET_ID:  LKD_0x117_IMAGE_igdkmd64.sys
+
+BUCKET_ID:  LKD_0x117_IMAGE_igdkmd64.sys
+
+PRIMARY_PROBLEM_CLASS:  LKD_0x117_IMAGE_igdkmd64.sys
+
+TARGET_TIME:  2016-02-02T11:24:05.000Z
+
+OSBUILD:  10586
+
+OSSERVICEPACK:  0
+
+SERVICEPACK_NUMBER: 0
+
+OS_REVISION: 0
+
+SUITE_MASK:  272
+
+PRODUCT_TYPE:  1
+
+OSPLATFORM_TYPE:  x64
+
+OSNAME:  Windows 10
+
+OSEDITION:  Windows 10 WinNt TerminalServer SingleUserTS
+
+OS_LOCALE:  
+
+USER_LCID:  0
+
+OSBUILD_TIMESTAMP:  2016-01-05 06:58:56
+
+BUILDDATESTAMP_STR:  160104-1513
+
+BUILDLAB_STR:  th2_release
+
+BUILDOSVER_STR:  10.0.10586.63.amd64fre.th2_release.160104-1513
+
+ANALYSIS_SESSION_ELAPSED_TIME: 5dc
+
+ANALYSIS_SOURCE:  KM
+
+FAILURE_ID_HASH_STRING:  km:lkd_0x117_image_igdkmd64.sys
+
+FAILURE_ID_HASH:  {df5cc292-6e03-34f8-7849-e22c43f13df4}</code></pre><p>I'd have generally chalked it up as an Intel driver issue and moved on, however, interesting I received about 2 or 3 different updates from Windows Update for the same Intel Graphics driver. Windows update seemed to have been the most reliable place for drivers which are expected to have been well tested, but all of them ended up crashing exactly the same way.</p><h3>Could it be the hardware?</h3><p>This was an interesting issue since even the kernel logger failed to capture anything useful for the events on the release builds. And so, I had to ensure that the fault didn't lie in the hardware first. UEFI Diagnostics seemed to show no inconsistencies. Besides, older builds of Windows, coupled with older drivers (as well as my Linux OSes - though that might not necessarily prove much in this context) doesn't seem to have these problems. This issue didn't exist before the 10586 build, but seems to exist in all later insider builds till date.</p><p class="note"><strong>So, I was left with no reason to doubt the hardware.</strong></p><h3>Potential cause</h3><p>This was on the retail build (10586). And the same thing happens on Safe Mode as well during the installation. It generates numerous minidumps. The Insider builds for some reason didn't generate the minidumps which were generated on the retail build. So, based on the watchdog reports, it seems like <strong>the driver fails on infinite loop, but just not quickly enough for the watch dog to catch it and crash</strong>. So, it ends up on a blank screen instead of BSOD. However that doesn't explain the lack of more logging on when the driver crashed. So, that puts me on a track to the likely suspect: <strong>The Windows Graphics Stack</strong>. There has been a signficant amount of changes into the RedStone build, and there were also more bug stack bugs that were reported. But it could also be something terribly wrong in the driver.</p><p>However without the correct symbols or the debug build, this is as much as I could narrow it down to. Likely, <strong>the problems lie in both the new Graphics Stack (which hopefully will get fixed in the newer builds), and Intel's driver</strong>.</p><p>The only real data that were reliable enough for analysis were the numerous minidumps. And my guess is that, even them, probably mostly only contains where the WatchDog timeouts happen, and likely provide an insight into the problematic driver and zones, though not helping much with the precise problem in the driver.</p><h2>Minidumps</h2><p>I did end up with a full memory dump and shared them with Microsoft. However, the rest of the minidumps are shared publicly here for the inquisitive minds:</p><p><strong>2016-Q1-Kernel-Graphics</strong> (OneDrive folder with all the dumps):<br><a href="https://1drv.ms/f/s!Agt9I4vUjzpCg4d1Je-LckF4grKXnw">https://1drv.ms/f/s!Agt9I4vUjzpCg4d1Je-LckF4grKXnw</a></p><p>This includes the <i>LiveKernelReports</i> (Watchdog dumps), and the <i>WER Kernel Reports</i>.</p></article></main><footer class="mt-4"><hr><aside class="my-3"><p><a href="https://www.twitter.com/prasannavl">@prasannavl</a> - If you enjoyed this post, please <a href="https://twitter.com/intent/tweet?url=https://www.prasannavl.com/2016/02/crash-analysis-windows-graphics-stack-bug/" target="_blank">share it with your followers</a>.</p></aside><hr><nav class="clearfix footer-nav"><ul class="float-left list-inline"><li class="list-inline-item"><a href="javascript:window.scroll(0,0)">Top</a></li><li class="list-inline-item"><a href="/">Home</a></li><li class="list-inline-item"><a href="/archives/">Archives</a></li></ul></nav><p class="small text-muted mb-0 mt-1"><strong>Copyright © 2020 <a href="/">Prasanna Loganathar</a></strong>. Blog content, design elements or any information without a direct or indirect license is licensed under <a href="https://creativecommons.org/licenses/by/4.0/" rel="license">Creative Commons CC BY 4.0</a>. Similarly, any such code fragments are licensed under <a href="http://www.apache.org/licenses/LICENSE-2.0" rel="license">Apache 2.0 License</a>.</p></footer></div></div></div></div><div id="nprogress" style="transition:all .4s linear 0s;opacity:0"><div class="bar" role="bar" style="transform:translate3d(0,0,0);transition:all .4s ease 0s"><div class="peg"></div></div><div class="spinner" role="spinner"><div class="spinner-icon"></div></div></div></body></html>
